@@ -37,7 +37,7 @@ namespace FileCertificateEncryption
                 aesKey.IV = ivKey;
                 var decryptor = aesKey.CreateDecryptor();
 
-                //I use trancate mode, so the file opens up and is empty.
+                //We're using truncate mode, so the file opens up and is empty.
                 using (var fileStream = new FileStream(filePath, FileMode.Truncate))
                 using (var decryptStream = new CryptoStream(fileStream, decryptor, CryptoStreamMode.Write))
                 using (var encryptedFileStream = new MemoryStream(file.ToArray()))
