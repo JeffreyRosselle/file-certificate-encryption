@@ -13,10 +13,14 @@ namespace FileCertificateEncryption
     {
         public static async Task Decrypt(string filePath, string certName, string password)
         {
+            //Read the file in memory so we can overwrite the source with it's original file.
+            //We also need it in memory so we can extract the key.
             var file = (await File.ReadAllBytesAsync(filePath)).ToList();
             var encryptedKey = new Collection<byte>();
-            //Checking the length so we know how much we bytes we need to take from the file.
+            //Checking the length so we know how much bytes we need to take from the file.
+            //Different certificates can create different size of keys.
             var encryptLength = Encrypter.EncryptKey(Encoding.UTF8.GetBytes("string"), certName, password).Length;
+            //Extract the key.
             for (var i = 0; i < encryptLength; i++)
                 encryptedKey.Add(file[i]);
             file.RemoveRange(0, encryptLength);
@@ -25,6 +29,7 @@ namespace FileCertificateEncryption
 
             using (var managed = new AesManaged())
             {
+                //We're using AES encryption, but this time we do not generate the key but pass our decrypted key.
                 Aes aesKey = Aes.Create();
                 aesKey.Key = decryptedKey;
                 byte[] ivKey = new byte[aesKey.IV.Length];
@@ -32,10 +37,11 @@ namespace FileCertificateEncryption
                 aesKey.IV = ivKey;
                 var decryptor = aesKey.CreateDecryptor();
 
-                using (var cryptFileStream = new FileStream(filePath, FileMode.Truncate))
-                using (var decryptStream = new CryptoStream(cryptFileStream, decryptor, CryptoStreamMode.Write))
-                using (var outputFileStream = new MemoryStream(file.ToArray()))
-                    await outputFileStream.CopyToAsync(decryptStream);
+                //I use trancate mode, so the file opens up and is empty.
+                using (var fileStream = new FileStream(filePath, FileMode.Truncate))
+                using (var decryptStream = new CryptoStream(fileStream, decryptor, CryptoStreamMode.Write))
+                using (var encryptedFileStream = new MemoryStream(file.ToArray()))
+                    await encryptedFileStream.CopyToAsync(decryptStream);
             }
         }
 
@@ -43,6 +49,7 @@ namespace FileCertificateEncryption
         {
             var cert = new X509Certificate2(certName, password);
             var privateKey = cert.GetRSAPrivateKey();
+            //Decrypt the key with the same padding used to encrypt it.
             return privateKey.Decrypt(keyBytes, RSAEncryptionPadding.OaepSHA512);
         }
     }
